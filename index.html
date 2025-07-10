@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChromaVerse - Next-Gen Color Game</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="particles"></div>
+    <div class="game-container">
+        <div class="header">
+            <div class="logo-container">
+                <div class="logo-icon"></div>
+                <h1 class="title">ChromaVerse</h1>
+            </div>
+            <div class="level-indicator">
+                <span class="level-text">Level</span>
+                <span class="level-number" id="level">1</span>
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">🎯</div>
+                <div class="stat-value" id="score">0</div>
+                <div class="stat-label">Score</div>
+                <div class="stat-progress"><div class="stat-fill" id="scoreFill"></div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔥</div>
+                <div class="stat-value" id="streak">0</div>
+                <div class="stat-label">Streak</div>
+                <div class="stat-progress"><div class="stat-fill" id="streakFill"></div></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">👑</div>
+                <div class="stat-value" id="best">0</div>
+                <div class="stat-label">Best</div>
+                <div class="stat-progress"><div class="stat-fill" id="bestFill"></div></div>
+            </div>
+            <div class="stat-card timer-card">
+                <div class="stat-icon">⏱️</div>
+                <div class="stat-value" id="timer">30</div>
+                <div class="stat-label">Time</div>
+                <div class="circular-progress">
+                    <svg class="progress-ring" width="60" height="60">
+                        <circle class="progress-ring-circle" cx="30" cy="30" r="25"></circle>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="game-modes">
+            <button class="mode-btn active" data-mode="rgb">RGB Mode</button>
+            <button class="mode-btn" data-mode="hex">HEX Mode</button>
+            <button class="mode-btn" data-mode="hsl">HSL Mode</button>
+        </div>
+
+        <div class="difficulty-selector">
+            <button class="difficulty-btn active" data-difficulty="easy">Easy</button>
+            <button class="difficulty-btn" data-difficulty="medium">Medium</button>
+            <button class="difficulty-btn" data-difficulty="hard">Hard</button>
+        </div>
+
+        <div class="color-showcase">
+            <div class="color-display" id="colorDisplay">
+                <div class="color-overlay"></div>
+                <div class="color-ripple"></div>
+            </div>
+            <div class="color-info">
+                <div class="color-value" id="colorValue"></div>
+                <div class="color-hint" id="colorHint">Find the matching color</div>
+            </div>
+        </div>
+        
+        <div class="options-grid" id="optionsGrid"></div>
+
+        <div class="controls">
+            <button class="control-btn primary" id="newGameBtn">
+                <span class="btn-icon">🎮</span>
+                <span class="btn-text">New Game</span>
+            </button>
+            <button class="control-btn secondary" id="pauseBtn">
+                <span class="btn-icon">⏸️</span>
+                <span class="btn-text">Pause</span>
+            </button>
+            <button class="control-btn tertiary" id="hintBtn">
+                <span class="btn-icon">💡</span>
+                <span class="btn-text">Hint</span>
+            </button>
+        </div>
+
+        <div class="feedback-container">
+            <div class="feedback" id="feedback"></div>
+            <div class="combo-indicator" id="comboIndicator"></div>
+        </div>
+
+        <div class="achievement-popup" id="achievementPopup">
+            <div class="achievement-icon"></div>
+            <div class="achievement-text"></div>
+        </div>
+    </div>
+
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-header">
+            <h3>Settings</h3>
+            <button class="close-btn" id="closeSettings">×</button>
+        </div>
+        <div class="settings-content">
+            <div class="setting-group">
+                <label>Sound Effects</label>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="soundToggle" checked>
+                    <span class="slider"></span>
+                </div>
+            </div>
+            <div class="setting-group">
+                <label>Animations</label>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="animToggle" checked>
+                    <span class="slider"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button class="settings-btn" id="settingsBtn">⚙️</button>
+
+    <script src="script.js"></script>
+</body>
+</html>
