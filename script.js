@@ -15,6 +15,10 @@ class ChromaVerseGame {
         this.soundEnabled = true;
         this.animationsEnabled = true;
         this.achievements = JSON.parse(localStorage.getItem('chromaVerseAchievements') || '[]');
+        this.powerUps = { timeBonus: 0, doubleScore: 0, easyMode: 0 };
+        this.lastAnswerTime = Date.now();
+        this.quickAnswerBonus = 0;
+        this.gameStats = { totalGames: 0, totalAnswers: 0, correctAnswers: 0 };
         
         this.initializeElements();
         this.attachEventListeners();
@@ -179,10 +183,15 @@ class ChromaVerseGame {
     }
 
     generateNewQuestion() {
+        // Don't generate new questions if game is not active
+        if (!this.gameActive || this.timeLeft <= 0) {
+            return;
+        }
+
         this.correctColor = this.generateRandomColor();
         const variance = this.getVarianceByDifficulty();
         const optionsCount = this.getOptionsCount();
-        
+
         const options = [this.correctColor];
         for (let i = 1; i < optionsCount; i++) {
             options.push(this.generateSimilarColor(this.correctColor, variance));
@@ -194,37 +203,65 @@ class ChromaVerseGame {
             [options[i], options[j]] = [options[j], options[i]];
         }
 
+        // Smooth color transition
+        this.colorDisplay.style.transition = 'background-color 0.5s ease';
         this.colorDisplay.style.backgroundColor = `rgb(${this.correctColor.r}, ${this.correctColor.g}, ${this.correctColor.b})`;
         this.colorValue.textContent = this.colorToString(this.correctColor, this.currentMode);
-        
+
         if (this.animationsEnabled) {
             this.colorDisplay.classList.add('animate');
             setTimeout(() => this.colorDisplay.classList.remove('animate'), 600);
         }
 
-        this.optionsGrid.innerHTML = '';
-        options.forEach((color) => {
-            const btn = document.createElement('button');
-            btn.className = 'option-btn';
-            btn.style.backgroundColor = `rgb(${color.r}, ${color.g}, ${color.b})`;
-            btn.addEventListener('click', () => this.checkAnswer(color));
-            this.optionsGrid.appendChild(btn);
+        // Use requestAnimationFrame for smoother rendering
+        requestAnimationFrame(() => {
+            this.optionsGrid.innerHTML = '';
+            options.forEach((color, index) => {
+                setTimeout(() => {
+                    // Check again if game is still active before creating buttons
+                    if (!this.gameActive || this.timeLeft <= 0) {
+                        return;
+                    }
+
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.style.backgroundColor = `rgb(${color.r}, ${color.g}, ${color.b})`;
+                    btn.style.opacity = '0';
+                    btn.style.transform = 'scale(0.8)';
+                    btn.addEventListener('click', () => this.checkAnswer(color));
+                    this.optionsGrid.appendChild(btn);
+
+                    // Animate in
+                    requestAnimationFrame(() => {
+                        btn.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                        btn.style.opacity = '1';
+                        btn.style.transform = 'scale(1)';
+                    });
+                }, index * 50);
+            });
         });
 
         this.updateHint();
         this.hideFeedback();
+        this.lastAnswerTime = Date.now();
     }
 
     checkAnswer(selectedColor) {
+        // Don't process answers if game is not active
+        if (!this.gameActive || this.timeLeft <= 0) {
+            return;
+        }
+
         const isCorrect = selectedColor.r === this.correctColor.r &&
                         selectedColor.g === this.correctColor.g &&
                         selectedColor.b === this.correctColor.b;
 
         const buttons = document.querySelectorAll('.option-btn');
         buttons.forEach(btn => {
+            btn.style.pointerEvents = 'none'; // Disable further clicks
             const btnColor = btn.style.backgroundColor;
             const correctColorStr = `rgb(${this.correctColor.r}, ${this.correctColor.g}, ${this.correctColor.b})`;
-            
+
             if (btnColor === correctColorStr) {
                 btn.classList.add('correct');
             } else if (btnColor === `rgb(${selectedColor.r}, ${selectedColor.g}, ${selectedColor.b})` && !isCorrect) {
@@ -239,21 +276,54 @@ class ChromaVerseGame {
         }
 
         this.updateDisplay();
-        setTimeout(() => this.generateNewQuestion(), 1500);
+
+        // Only generate new question if game is still active
+        if (this.gameActive && this.timeLeft > 0) {
+            setTimeout(() => {
+                if (this.gameActive && this.timeLeft > 0) {
+                    this.generateNewQuestion();
+                }
+            }, 1500);
+        }
     }
 
     handleCorrectAnswer() {
-        const points = this.getPointsByDifficulty();
+        const basePoints = this.getPointsByDifficulty();
+        let points = basePoints;
+
+        // Quick answer bonus
+        const answerTime = Date.now() - this.lastAnswerTime;
+        if (answerTime < 3000) {
+            const quickBonus = Math.floor((3000 - answerTime) / 100);
+            points += quickBonus;
+            this.quickAnswerBonus = quickBonus;
+        }
+
+        // Double score power-up
+        if (this.powerUps.doubleScore > 0) {
+            points *= 2;
+            this.powerUps.doubleScore--;
+        }
+
         this.score += points;
         this.streak++;
-        
+        this.gameStats.correctAnswers++;
+        this.gameStats.totalAnswers++;
+
         if (this.streak > 0 && this.streak % 5 === 0) {
             this.level++;
             this.showAchievement('🎉', `Level ${this.level} Unlocked!`);
+            this.grantRandomPowerUp();
         }
 
-        this.showFeedback(`Perfect! +${points} points`, 'success');
-        
+        let feedbackText = `Perfect! +${points} points`;
+        if (this.quickAnswerBonus > 0) {
+            feedbackText += ` (Quick +${this.quickAnswerBonus}!)`;
+            this.quickAnswerBonus = 0;
+        }
+
+        this.showFeedback(feedbackText, 'success');
+
         if (this.streak >= 3) {
             this.showCombo(`${this.streak}x Combo!`);
         }
@@ -264,7 +334,12 @@ class ChromaVerseGame {
 
     handleWrongAnswer() {
         this.streak = 0;
-        this.showFeedback('Not quite right! Try again.', 'error');
+        this.gameStats.totalAnswers++;
+
+        // Calculate accuracy
+        const accuracy = Math.round((this.gameStats.correctAnswers / this.gameStats.totalAnswers) * 100);
+
+        this.showFeedback(`Not quite right! Accuracy: ${accuracy}%`, 'error');
         this.playSound('wrong');
     }
 
@@ -397,6 +472,18 @@ class ChromaVerseGame {
         this.hintsUsed = 0;
         this.gameActive = true;
         this.isPaused = false;
+        this.powerUps = { timeBonus: 0, doubleScore: 0, easyMode: 0 };
+        this.quickAnswerBonus = 0;
+
+        // Remove game-over class
+        document.body.classList.remove('game-over');
+
+        // Re-enable all buttons
+        document.querySelectorAll('.option-btn, .mode-btn, .difficulty-btn').forEach(btn => {
+            btn.style.pointerEvents = 'auto';
+            btn.style.opacity = '1';
+        });
+
         this.updateDisplay();
         this.generateNewQuestion();
         this.startTimer();
@@ -411,8 +498,10 @@ class ChromaVerseGame {
             if (!this.isPaused && this.gameActive) {
                 this.timeLeft--;
                 this.updateTimerDisplay();
-                
+
                 if (this.timeLeft <= 0) {
+                    clearInterval(this.timer);
+                    this.timeLeft = 0;
                     this.endGame();
                 }
             }
@@ -440,18 +529,40 @@ class ChromaVerseGame {
     endGame() {
         this.gameActive = false;
         clearInterval(this.timer);
-        
+
+        // Add game-over class for visual styling
+        document.body.classList.add('game-over');
+
+        // Disable all option buttons
+        const buttons = document.querySelectorAll('.option-btn');
+        buttons.forEach(btn => {
+            btn.style.pointerEvents = 'none';
+        });
+
+        // Disable game mode and difficulty buttons
+        document.querySelectorAll('.mode-btn, .difficulty-btn').forEach(btn => {
+            btn.style.pointerEvents = 'none';
+        });
+
         if (this.score > this.bestScore) {
             this.bestScore = this.score;
             localStorage.setItem('chromaVerseBest', this.bestScore);
             this.showAchievement('👑', `New Best Score: ${this.score}!`);
         }
 
-        this.showFeedback(`Game Over! Final Score: ${this.score}`, 'error');
+        const accuracy = this.gameStats.totalAnswers > 0
+            ? Math.round((this.gameStats.correctAnswers / this.gameStats.totalAnswers) * 100)
+            : 0;
+
+        this.showFeedback(`Game Over! Score: ${this.score} | Accuracy: ${accuracy}%`, 'error');
         this.updateDisplay();
         this.newGameBtn.querySelector('.btn-text').textContent = 'New Game';
         this.pauseBtn.style.display = 'none';
         this.hintBtn.style.display = 'none';
+
+        // Update game statistics
+        this.gameStats.totalGames++;
+        localStorage.setItem('chromaVerseGameStats', JSON.stringify(this.gameStats));
     }
 
     updateDisplay() {
@@ -474,11 +585,62 @@ class ChromaVerseGame {
         const percentage = (this.timeLeft / 30) * 100;
         const circumference = 2 * Math.PI * 25;
         const strokeDashoffset = circumference - (percentage / 100) * circumference;
-        
+
         if (this.progressRing) {
             this.progressRing.style.strokeDasharray = circumference;
             this.progressRing.style.strokeDashoffset = strokeDashoffset;
+
+            // Color changes based on time left
+            if (this.timeLeft <= 5) {
+                this.progressRing.style.stroke = 'var(--error)';
+            } else if (this.timeLeft <= 10) {
+                this.progressRing.style.stroke = 'var(--warning)';
+            } else {
+                this.progressRing.style.stroke = 'var(--accent)';
+            }
         }
+    }
+
+    grantRandomPowerUp() {
+        const powerUps = ['timeBonus', 'doubleScore', 'easyMode'];
+        const randomPowerUp = powerUps[Math.floor(Math.random() * powerUps.length)];
+
+        switch (randomPowerUp) {
+            case 'timeBonus':
+                this.timeLeft += 5;
+                this.powerUps.timeBonus++;
+                this.showAchievement('⏰', '+5 Seconds!');
+                break;
+            case 'doubleScore':
+                this.powerUps.doubleScore += 3;
+                this.showAchievement('💎', '2x Score (3 questions)!');
+                break;
+            case 'easyMode':
+                this.powerUps.easyMode += 2;
+                this.showAchievement('🎯', 'Easy Mode (2 questions)!');
+                break;
+        }
+    }
+
+    getVarianceByDifficulty() {
+        let base = { easy: 80, medium: 50, hard: 25 }[this.difficulty];
+
+        // Apply easy mode power-up
+        if (this.powerUps.easyMode > 0) {
+            base += 30;
+            this.powerUps.easyMode--;
+        }
+
+        return Math.max(15, base - this.level * 2);
+    }
+
+    showEnhancedFeedback(message, type, duration = 2000) {
+        this.feedback.textContent = message;
+        this.feedback.className = `feedback ${type} show enhanced`;
+
+        setTimeout(() => {
+            this.feedback.classList.remove('show', 'enhanced');
+        }, duration);
     }
 }
 
